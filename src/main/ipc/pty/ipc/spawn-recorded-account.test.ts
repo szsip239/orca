@@ -1,4 +1,5 @@
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -25,6 +26,35 @@ vi.mock('../../../managed-data-accounts/service', () => ({
 }))
 
 describe('recordedSessionRestartRefusal', () => {
+  it('proves an alternate Claude transcript filename before pinning its account', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'claude-restart-proof-'))
+    try {
+      const account = join(root, 'account')
+      const directory = join(account, 'projects', '-repo')
+      await mkdir(directory, { recursive: true })
+      const transcriptPath = join(directory, 'forked-name.jsonl')
+      await writeFile(transcriptPath, `${JSON.stringify({ sessionId: 'sess-1', type: 'user' })}\n`)
+      const env: Record<string, string> = {}
+      const args = {
+        resumeOnSelectedAccount: false as const,
+        launchAgent: 'claude',
+        env,
+        resumeProviderSession: { key: 'session_id' as const, id: 'sess-1', transcriptPath }
+      }
+      expect(await prepareStrictClaudeRestart(args)).toBeNull()
+      expect(args.env.CLAUDE_CONFIG_DIR).toBe(account)
+
+      await writeFile(
+        transcriptPath,
+        `${JSON.stringify({ sessionId: 'different', type: 'user' })}\n`
+      )
+      const mismatched = { ...args, env: {} }
+      expect(await prepareStrictClaudeRestart(mismatched)).toMatch(/could not prove/)
+      expect(mismatched.env).toEqual({})
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
   it('lets an account-switch restart keep the selected account', () => {
     expect(
       recordedSessionRestartRefusal({
@@ -34,7 +64,7 @@ describe('recordedSessionRestartRefusal', () => {
     ).toBeNull()
   })
 
-  it('does not treat a missing Codex home as unknown, and skips an unproven Claude home', () => {
+  it('does not treat a missing Codex home as unknown, and skips an unproven Claude home', async () => {
     expect(
       recordedSessionRestartRefusal({
         resumeOnSelectedAccount: false,
@@ -43,7 +73,7 @@ describe('recordedSessionRestartRefusal', () => {
       })
     ).toBeNull()
     expect(
-      prepareStrictClaudeRestart({
+      await prepareStrictClaudeRestart({
         resumeOnSelectedAccount: false,
         launchAgent: 'claude',
         env: {}
@@ -90,7 +120,7 @@ describe('recordedSessionRestartRefusal', () => {
     expect(prepare).toHaveBeenCalled()
   })
 
-  it('pins a managed Claude home from the session transcript when launch env is empty', () => {
+  it('pins a managed Claude home from the session transcript when launch env is empty', async () => {
     const env: Record<string, string> = { ORCA_PANE_KEY: 'pane' }
     const args = {
       resumeOnSelectedAccount: false as const,
@@ -102,13 +132,13 @@ describe('recordedSessionRestartRefusal', () => {
         transcriptPath: '/accounts/A/projects/-repo/sess-1.jsonl'
       }
     }
-    expect(prepareStrictClaudeRestart(args)).toBeNull()
+    expect(await prepareStrictClaudeRestart(args)).toBeNull()
     expect(args.env.CLAUDE_CONFIG_DIR).toBe('/accounts/A')
   })
 
-  it('leaves the default Claude home unpinned so the CLI keeps its Keychain identity', () => {
+  it('leaves the default Claude home unpinned so the CLI keeps its Keychain identity', async () => {
     vi.stubEnv('CLAUDE_CONFIG_DIR', '')
-    const strict = (transcriptPath: string, platform: NodeJS.Platform) => {
+    const strict = async (transcriptPath: string, platform: NodeJS.Platform) => {
       const env: Record<string, string> = {}
       const args = {
         resumeOnSelectedAccount: false as const,
@@ -116,14 +146,17 @@ describe('recordedSessionRestartRefusal', () => {
         env,
         resumeProviderSession: { key: 'session_id' as const, id: 'sess-1', transcriptPath }
       }
-      expect(prepareStrictClaudeRestart(args, platform)).toBeNull()
+      expect(await prepareStrictClaudeRestart(args, platform)).toBeNull()
       return args.env.CLAUDE_CONFIG_DIR
     }
     expect(
-      strict(join(homedir(), '.claude', 'projects', '-repo', 'sess-1.jsonl'), process.platform)
+      await strict(
+        join(homedir(), '.claude', 'projects', '-repo', 'sess-1.jsonl'),
+        process.platform
+      )
     ).toBeUndefined()
-    expect(strict('/home/me/.claude/projects/-repo/sess-1.jsonl', 'win32')).toBeUndefined()
-    expect(strict('/home/me/profiles/work/projects/-repo/sess-1.jsonl', 'win32')).toBe(
+    expect(await strict('/home/me/.claude/projects/-repo/sess-1.jsonl', 'win32')).toBeUndefined()
+    expect(await strict('/home/me/profiles/work/projects/-repo/sess-1.jsonl', 'win32')).toBe(
       '/home/me/profiles/work'
     )
     vi.unstubAllEnvs()

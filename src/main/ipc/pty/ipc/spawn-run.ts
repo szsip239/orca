@@ -107,7 +107,7 @@ export async function runPtyIpcSpawn(deps: PtySpawnIpcDeps, request: PtySpawnIpc
     ...(args.replacesPtyId !== undefined
       ? {
           replace: async () => {
-            const claudeRefusal = prepareStrictClaudeRestart(args)
+            const claudeRefusal = await prepareStrictClaudeRestart(args)
             const refusal =
               claudeRefusal ??
               (await strictCodexSessionRestartRefusal(

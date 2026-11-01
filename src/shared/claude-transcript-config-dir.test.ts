@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { claudeConfigDirFromTranscriptPath } from './claude-transcript-config-dir'
+import {
+  claudeConfigDirCandidate,
+  claudeConfigDirFromTranscriptPath
+} from './claude-transcript-config-dir'
 
 describe('claudeConfigDirFromTranscriptPath', () => {
   it('reads a POSIX config dir only from an exact session filename', () => {
@@ -18,6 +21,16 @@ describe('claudeConfigDirFromTranscriptPath', () => {
     expect(
       claudeConfigDirFromTranscriptPath('C:\\accounts\\A\\projects\\-repo\\sess-1.jsonl', 'sess-1')
     ).toBe('C:\\accounts\\A')
+  })
+
+  it('recognizes a plausible alternate filename but rejects traversal', () => {
+    expect(claudeConfigDirCandidate('/accounts/A/projects/-repo/fork.jsonl')).toBe('/accounts/A')
+    expect(claudeConfigDirCandidate('/accounts/A/projects/../fork.jsonl')).toBeNull()
+    expect(claudeConfigDirCandidate('/accounts/A/projects/-repo/fork.txt')).toBeNull()
+    const mixedPath = ['C:', 'accounts', 'A', 'projects', '-repo/../../escape', 'fork.jsonl'].join(
+      '\\'
+    )
+    expect(claudeConfigDirCandidate(mixedPath)).toBeNull()
   })
 
   it('preserves UNC and drive roots and rejects drive-relative Windows paths', () => {

@@ -9,12 +9,29 @@ export function claudeConfigDirFromTranscriptPath(
 ): string | null {
   const transcript = transcriptPath?.trim()
   const id = sessionId?.trim()
-  if (!transcript || !id || transcript.includes('\0')) {
+  if (!transcript || !id) {
+    return null
+  }
+  const filename = transcript.split(/[\\/]/).at(-1)
+  return filename === `${id}.jsonl` ? claudeConfigDirCandidate(transcript) : null
+}
+
+/** Main must verify the session inside a candidate whose filename is not the session id. */
+export function claudeConfigDirCandidate(transcriptPath: string | undefined): string | null {
+  const transcript = transcriptPath?.trim()
+  if (!transcript || transcript.includes('\0')) {
     return null
   }
   const slash = transcript.includes('\\') ? '\\' : '/'
-  const parts = transcript.split(slash)
-  if (parts.at(-1) !== `${id}.jsonl` || parts.length < 4) {
+  const parts = transcript.split(/[\\/]/)
+  const filename = parts.at(-1)
+  if (
+    !filename ||
+    !filename.endsWith('.jsonl') ||
+    filename === '.jsonl' ||
+    parts.length < 4 ||
+    parts.some((part) => part === '.' || part === '..')
+  ) {
     return null
   }
   const projects = parts.at(-3)

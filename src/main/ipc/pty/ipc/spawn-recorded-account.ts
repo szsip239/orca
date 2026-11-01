@@ -1,5 +1,9 @@
 import type { AgentProviderSessionMetadata } from '../../../../shared/agent-session/lifecycle/agent-session-resume'
-import { claudeConfigDirFromTranscriptPath } from '../../../../shared/claude-transcript-config-dir'
+import {
+  claudeConfigDirCandidate,
+  claudeConfigDirFromTranscriptPath
+} from '../../../../shared/claude-transcript-config-dir'
+import { readTranscriptSlice } from '../../../native-chat/wsl-transcript-fs-access'
 import {
   CLAUDE_INJECTED_CONFIG_DIR_ENV,
   CLAUDE_PROFILE_POINTER_ENV
@@ -41,7 +45,7 @@ function isWslDefaultClaudeHome(home: string, platform: NodeJS.Platform): boolea
  * config dir, or refuse before the old process stops.
  * The default home stays unpinned: an explicit default changes Claude's Keychain identity.
  */
-export function prepareStrictClaudeRestart(
+export async function prepareStrictClaudeRestart(
   args: {
     resumeOnSelectedAccount?: boolean
     launchAgent?: string
@@ -49,17 +53,22 @@ export function prepareStrictClaudeRestart(
     resumeProviderSession?: AgentProviderSessionMetadata
   },
   platform: NodeJS.Platform = process.platform
-): string | null {
+): Promise<string | null> {
   if (args.resumeOnSelectedAccount !== false || args.launchAgent !== 'claude') {
     return null
   }
   if (args.env?.CLAUDE_CONFIG_DIR?.trim()) {
     return null
   }
-  const home = claudeConfigDirFromTranscriptPath(
-    args.resumeProviderSession?.transcriptPath,
-    args.resumeProviderSession?.id
-  )
+  const transcript = args.resumeProviderSession?.transcriptPath
+  const sessionId = args.resumeProviderSession?.id
+  let home = claudeConfigDirFromTranscriptPath(transcript, sessionId)
+  if (!home && transcript && sessionId) {
+    const candidate = claudeConfigDirCandidate(transcript)
+    if (candidate && (await claudeTranscriptNamesSession(transcript, sessionId))) {
+      home = candidate
+    }
+  }
   if (!home) {
     return 'session restart could not prove the original Claude account'
   }
@@ -67,6 +76,30 @@ export function prepareStrictClaudeRestart(
     args.env = { ...args.env, ...claudeConfigDirEnvPatch(home, { platform }) }
   }
   return null
+}
+
+async function claudeTranscriptNamesSession(path: string, sessionId: string): Promise<boolean> {
+  try {
+    const head = await readTranscriptSlice(path, 0, 256 * 1024, 'exact')
+    for (const line of head.toString('utf8').split('\n')) {
+      try {
+        const record: unknown = JSON.parse(line)
+        if (
+          record &&
+          typeof record === 'object' &&
+          'sessionId' in record &&
+          record.sessionId === sessionId
+        ) {
+          return true
+        }
+      } catch {
+        // A partial or malformed line cannot establish the session identity.
+      }
+    }
+  } catch {
+    // Unreadable transcripts do not prove the original account.
+  }
+  return false
 }
 
 function managedDataAccountProvider(agent: string): ManagedDataAccountProvider | null {

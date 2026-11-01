@@ -150,6 +150,19 @@ describe('buildAgentSessionRestartStartup', () => {
     expect(startup?.command).toContain(SESSION_ID)
   })
 
+  it('allows main to verify a Claude transcript whose filename differs from its session id', () => {
+    seedAgentStatus({
+      agentType: 'claude',
+      providerSession: {
+        key: 'session_id',
+        id: SESSION_ID,
+        transcriptPath: '/accounts/A/projects/-repo/forked-name.jsonl'
+      }
+    })
+    seedLaunch({ agentEnv: {} })
+    expect(buildAgentSessionRestartStartup('claude', PANE)?.command).toContain(SESSION_ID)
+  })
+
   it('skips a Claude restart that cannot prove the original account', () => {
     seedAgentStatus({
       agentType: 'claude',

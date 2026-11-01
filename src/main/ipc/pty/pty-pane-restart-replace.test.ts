@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { installClaudeProfileRouter } from '../../claude-accounts/claude-profile-installed-router'
 import type { ClaudeProfileRouter } from '../../claude-accounts/claude-profile-router'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
@@ -223,6 +226,38 @@ describe('pty:spawn replacing a pane owner', () => {
     ).rejects.toThrow(/could not prove the original Claude account/)
     expect(shutdown).not.toHaveBeenCalled()
     expect(providerSpawn).not.toHaveBeenCalled()
+  })
+
+  it('verifies an alternate transcript before replacing the Claude process', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-claude-restart-'))
+    try {
+      const account = join(root, 'account')
+      const directory = join(account, 'projects', '-repo')
+      await mkdir(directory, { recursive: true })
+      const transcriptPath = join(directory, 'forked-name.jsonl')
+      await writeFile(transcriptPath, `${JSON.stringify({ sessionId: 'different' })}\n`)
+      const { providerSpawn, shutdown, store, runtime } = installRestartHarness()
+      registerWithFakes(mainWindow, runtime, store)
+      const args = restartSpawnArgs({
+        replacesPtyId: 'pty-old',
+        resumeOnSelectedAccount: false,
+        launchAgent: 'claude',
+        command: "claude '--resume' 'sess-1'",
+        resumeProviderSession: { key: 'session_id', id: 'sess-1', transcriptPath },
+        env: { ORCA_PANE_KEY: paneKey, ORCA_TAB_ID: tabId, ORCA_WORKTREE_ID: worktreeId }
+      })
+      await expect(handlers.get('pty:spawn')!(null, args)).rejects.toThrow(/could not prove/)
+      expect(shutdown).not.toHaveBeenCalled()
+      expect(providerSpawn).not.toHaveBeenCalled()
+
+      await writeFile(transcriptPath, `${JSON.stringify({ sessionId: 'sess-1' })}\n`)
+      await expect(handlers.get('pty:spawn')!(null, args)).resolves.toMatchObject({ id: 'pty-new' })
+      expect(shutdown).toHaveBeenCalledWith('pty-old', expect.objectContaining({ immediate: true }))
+      const fresh = providerSpawn.mock.calls.find((call) => !call[0].attachOnly)?.[0]
+      expect(fresh?.env?.CLAUDE_CONFIG_DIR).toBe(account)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('stops the replaced owner and launches fresh instead of reattaching it', async () => {
