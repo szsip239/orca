@@ -37,8 +37,8 @@ vi.mock('@/lib/structured-agent-session-launch-options', () => ({
   getStructuredAgentSessionLaunchSelection: () => null
 }))
 
-import type { AgentSessionModelCatalogResult } from '../../../../shared/agent-session-wire'
-import type { SessionOptionDescriptor } from '../../../../shared/native-chat-session-options'
+import type { AgentSessionModelCatalogResult } from '../../../../shared/agent-session/agent-session-wire'
+import type { SessionOptionDescriptor } from '../../../../shared/native-chat/input/native-chat-session-options'
 import { getDefaultSettings } from '../../../../shared/constants'
 import { useAppStore } from '@/store'
 import { resetHostModelCatalogSnapshotsForTests } from '@/runtime/host-model-catalog-snapshots'
@@ -111,7 +111,7 @@ function renderNewChat(agent: string) {
       turnId: null,
       unloadedTurnRevisions: undefined,
       mutate: vi.fn(),
-      launch: { kind: 'new', heldOptions: {}, worktree: 'id:wt-1' }
+      launch: { kind: 'new', worktree: 'id:wt-1' }
     })
     frames.push(pill(options.optionSnapshot))
     return options

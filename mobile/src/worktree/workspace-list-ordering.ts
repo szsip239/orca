@@ -57,13 +57,9 @@ export function sortWorktrees(
       })
     )
   }
-  // Headless hosts stamp lastActivityAt only at creation, so terminal output must count toward recency.
+  // Match desktop's effectiveRecentActivity: terminal output never counts as activity.
   const recentActivity = (w: Worktree): number =>
-    recentActivityWithCreateGrace(
-      Math.max(finiteOr(w.lastActivityAt, 0), finiteOr(w.lastOutputAt, 0)),
-      w.createdAt,
-      now
-    )
+    recentActivityWithCreateGrace(finiteOr(w.lastActivityAt, 0), w.createdAt, now)
   const compareRecent = (a: Worktree, b: Worktree): number =>
     recentActivity(b) - recentActivity(a) ||
     compareSidebarText(a.displayName, b.displayName) ||
@@ -94,8 +90,13 @@ export function sortWorktrees(
   )
 }
 
+type WorktreeStatusInputs = Pick<
+  Worktree,
+  'hasHostSidebarActivity' | 'status' | 'liveTerminalCount' | 'sidebarStatus'
+>
+
 export function getWorktreeStatus(
-  w: Worktree
+  w: WorktreeStatusInputs
 ): 'working' | 'active' | 'permission' | 'done' | 'inactive' {
   // Match desktop sidebar activity; retained/background PTYs alone must not imply an active workspace.
   if (w.hasHostSidebarActivity === false) {
@@ -131,6 +132,6 @@ function isHostVerdictDotStatus(value: string | undefined): value is WorktreeSta
   return value !== undefined && HOST_VERDICT_DOT_STATUSES.has(value)
 }
 
-export function getWorktreeDotStatus(w: Worktree): WorktreeStatus {
+export function getWorktreeDotStatus(w: WorktreeStatusInputs): WorktreeStatus {
   return isHostVerdictDotStatus(w.sidebarStatus) ? w.sidebarStatus : getWorktreeStatus(w)
 }

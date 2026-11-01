@@ -4,7 +4,6 @@ import type { SpawnDeferralReason } from '../../../../../shared/host-spawn-admis
 import { isRemoteRuntimePtyId } from '../../../../../shared/remote-runtime/remote-runtime-pty-id'
 import { useAppStore } from '@/store'
 import { hasWorktreeTeardownStarted } from '@/store/slices/worktree-delete-state-types'
-import { PROCESS_BOUNDARY_GROUND } from '../../../../../shared/terminal-mode-reset-profiles'
 import { hasPtySerializer } from '../pty-buffer-serializer'
 import { writeTerminalOutput } from '@/lib/pane-manager/pane-terminal-output-scheduler'
 
@@ -24,6 +23,17 @@ import { freshSpawnPtyId, freshSpawnTransportConnectOptions } from './fresh-spaw
 import { createSessionRestartNotifier } from '@/lib/agent-session-restart-verdict'
 import { finishFailedFreshSpawn } from './session-restart-refusal-reattach'
 
+export function releaseDeferredCwdFence(session: ConnectPanePtySession): void {
+  if (!session.transport.getPtyId()) {
+    session.transport.abandonPreconnectInput?.()
+    try {
+      session.deps.onDeferredCwdSpawnFailed?.()
+    } catch {
+      // Cleanup must not turn a settled spawn into an unhandled rejection.
+    }
+  }
+}
+
 export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
   session.startFreshSpawn = (
     startupOverride?: PendingStartupCommand | null,
@@ -32,31 +42,19 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
     const notifySessionRestart = createSessionRestartNotifier(() =>
       startupOverride === undefined ? session.paneStartup : startupOverride
     )
-    const releaseDeferredCwdFence = (): void => {
-      if (!session.transport.getPtyId()) {
-        // Abandoned spawns never connect; discard buffered input and settle its write promises here.
-        session.transport.abandonPreconnectInput?.()
-        try {
-          session.deps.onDeferredCwdSpawnFailed?.()
-        } catch {
-          // A cleanup callback must not turn a settled spawn into an unhandled rejection.
-        }
-      }
-    }
-
     if (
       hasWorktreeTeardownStarted(
         useAppStore.getState().deleteStateByWorktreeId?.[session.deps.worktreeId]
       )
     ) {
       // Worktree deletion already killed its PTYs; skip respawn into the directory being removed instead of racing main’s fence.
-      releaseDeferredCwdFence()
+      releaseDeferredCwdFence(session)
       notifySessionRestart(null)
       return Promise.resolve(null)
     }
     const effectiveStartup = startupOverride === undefined ? session.paneStartup : startupOverride
     if (effectiveStartup?.resumeSource?.cancelled) {
-      releaseDeferredCwdFence()
+      releaseDeferredCwdFence(session)
       notifySessionRestart(null)
       return Promise.resolve(null)
     }
@@ -68,7 +66,7 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
     // Cancelled replay can retain isUserScrolling; replacement shells must start following output.
     session.resetFreshSpawnFollowOutput()
     // Fresh processes cannot inherit the previous TUI’s screen or mouse/Kitty modes.
-    session.writeInputModeGround(PROCESS_BOUNDARY_GROUND)
+    session.groundInputModesForNewProcess()
     session.prepareFreshShellViewportForSpawn(options)
     const coldRestoreOverride =
       startupOverride && 'launchConfig' in startupOverride
@@ -133,19 +131,21 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
         session.pendingSpawnDeferral = null
         if (deferral) {
           // Why before the launch-config cleanup below: a deferred launch is postponed, not dead.
-          releaseDeferredCwdFence()
           clearPreSignaledSerializer()
           session.finishReattachLiveDataDeferral(false, outputCallbacks.generation)
           session.enterSpawnDeferredSleep(deferral, startupOverride, options, visibleAtSpawn)
           notifySessionRestart({ deferred: true })
           return null
         }
+        // Only the restart's deferred retries are the user's; a later wake is automatic again.
+        session.userRestart = false
         const connectResult =
           spawnedPtyId && typeof spawnedPtyId === 'object' && 'id' in spawnedPtyId
             ? spawnedPtyId
             : null
         // Legacy replies may omit incarnationId; remote evidence remains unverifiable until a stamped attach result.
         session.remotePtyIncarnationId = connectResult?.incarnationId ?? null
+        session.noteBoundProcessIncarnation(connectResult?.incarnationId)
         if (connectResult?.isReattach) {
           if (
             session.pendingStartupCommand?.resumeSource === effectiveStartup?.resumeSource &&
@@ -170,7 +170,7 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
           }
           if (!accepted) {
             // A rejected reattach ends this spawn; nothing later clears the fence.
-            releaseDeferredCwdFence()
+            releaseDeferredCwdFence(session)
           }
           notifySessionRestart(
             session.disposed || outputCallbacks.generation !== session.transportStreamGeneration
@@ -240,7 +240,7 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
           session.reconcilePtySizeAfterSpawn(resolvedPtyId, session.cols, session.rows)
         }
         if (!resolvedPtyId) {
-          releaseDeferredCwdFence()
+          releaseDeferredCwdFence(session)
           clearPreSignaledSerializer()
           session.finishReattachLiveDataDeferral(false, outputCallbacks.generation)
           notifySessionRestart(null)
@@ -271,7 +271,7 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
           ownerRefused,
           callbacks: outputCallbacks,
           predecessorPtyId,
-          releaseDeferredCwdFence,
+          releaseDeferredCwdFence: () => releaseDeferredCwdFence(session),
           clearPreSignaledSerializer,
           notify: notifySessionRestart,
           launchStartup: coldRestoreOverride ?? effectiveStartup,
@@ -308,7 +308,6 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
         }
         if (session.deferredSpawn) {
           // Why no remount: the host would defer the remount's restore again, in a loop.
-          session.settlePaneAttachAttempt?.('failed')
           return
         }
         settleSpawnThatLeftPaneUnbound(session)

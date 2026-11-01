@@ -5,13 +5,13 @@ import { basename, join, relative } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { buildClaudeChildProcessEnv } from './claude-child-process-environment'
 import * as claudeConnection from './claude-stream-json-connection'
-import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
+import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-identity'
 import { resolveSessionFilePath } from '../native-chat/session-file-resolver'
 import {
   CLAUDE_STRUCTURED_BASE_OPTIONS,
   claudeStructuredPermissionOptions
 } from './claude-structured-launch-resolution'
-import { readClaudeInit } from './claude-structured-init-proof'
+import { readClaudeInit } from './structured/claude-structured-init-proof'
 import {
   realClaudeAuthenticated,
   realClaudeAuthStatus,
@@ -20,13 +20,17 @@ import {
   realClaudeCommand,
   realClaudeLaunchHome
 } from './claude-real-cli-availability-test-support'
+import { ClaudeStructuredSessionAdapter } from './claude-structured-session-adapter'
+import type {
+  ClaudeStructuredSessionEvent,
+  ClaudeStructuredSessionAdapterDeps
+} from './structured/claude-structured-session-state'
+
 import {
-  ClaudeStructuredSessionAdapter,
-  type ClaudeStructuredSessionEvent
-} from './claude-structured-session-adapter'
-import type { ClaudeStructuredSessionAdapterDeps } from './claude-structured-session-state'
-import { claudeOpened, claudeStartupSettled } from './claude-structured-session-test-support'
-import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
+  claudeOpened,
+  claudeStartupSettled
+} from './claude-structured-startup-settled-test-support'
+import { claudeProviderHandle } from '../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
 
 const command = realClaudeCommand
 const suiteTitle = `Claude structured real CLI handshake${realClaudeCliGate.skipReason ? ` (skipped: ${realClaudeCliGate.skipReason})` : ''}`
@@ -57,6 +61,7 @@ function realAdapter(
         providerSessionId,
         resumeLeafUuid: null,
         resumesTranscript: false,
+        cliFlag: async () => 'supported' as const,
         continuesChain: false
       }
     },

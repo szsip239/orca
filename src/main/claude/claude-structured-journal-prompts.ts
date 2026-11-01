@@ -1,11 +1,11 @@
 import type {
   AgentJournalApprovalItem,
-  AgentJournalItemIdentity,
   AgentJournalProducerLinkage,
-  AgentJournalQuestionItem,
-  AgentJournalTurnScope
-} from '../../shared/agent-session-journal-types'
-import { agentJournalItemKey } from '../../shared/agent-session-journal-item-key'
+  AgentJournalQuestionItem
+} from '../../shared/agent-session/journal/agent-session-journal-types'
+import type { AgentJournalItemIdentity } from '../../shared/agent-session-journal-identity'
+import type { AgentJournalTurnScope } from '../../shared/agent-session-journal-turn-scope'
+import { agentJournalItemKey } from '../../shared/agent-session/journal/agent-session-journal-item-key'
 import { cancelledJournalPromptBody } from '../native-chat/agent-session-journal/journal-prompt-body-bounds'
 import type {
   StructuredAgentSessionEventSink,
@@ -17,7 +17,7 @@ import {
   claudeQuestionItems,
   type ClaudeQuestionItem
 } from './claude-structured-prompt-items'
-import type { ClaudeStructuredSessionEvent } from './claude-structured-session-state'
+import type { ClaudeStructuredSessionEvent } from './structured/claude-structured-session-state'
 
 const ADMITTED = { accepted: true } as const
 

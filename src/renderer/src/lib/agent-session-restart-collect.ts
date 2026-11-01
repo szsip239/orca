@@ -1,5 +1,5 @@
 import { isTerminalLeafId, makePaneKey } from '../../../shared/stable-pane-id'
-import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
+import type { AgentProviderSessionMetadata } from '../../../shared/agent-session/lifecycle/agent-session-resume'
 import type { AgentStatusState } from '../../../shared/agent-status-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import { isForeignMachineCodexPtyId } from './codex-pane-selection-lane'

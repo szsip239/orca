@@ -1,7 +1,7 @@
-import { AGENT_JOURNAL_THREAD_SCOPE } from '../../shared/agent-session-journal-types'
+import { AGENT_JOURNAL_THREAD_SCOPE } from '../../shared/agent-session/journal/agent-session-journal-types'
 import { describe, expect, it, vi } from 'vitest'
-import { agentJournalItemKey } from '../../shared/agent-session-journal-item-key'
-import type { AgentJournalItemBody } from '../../shared/agent-session-journal-types'
+import { agentJournalItemKey } from '../../shared/agent-session/journal/agent-session-journal-item-key'
+import type { AgentJournalItemBody } from '../../shared/agent-session/journal/agent-session-journal-types'
 import type {
   StructuredAgentSessionAppendOptions,
   StructuredAgentSessionEventSink
@@ -9,7 +9,7 @@ import type {
 import { ClaudeJournalPrompts } from './claude-structured-journal-prompts'
 import { claudeQuestionItems } from './claude-structured-prompt-items'
 import type { ClaudePendingPrompt } from './claude-structured-prompt-replies'
-import type { ClaudeStructuredSessionEvent } from './claude-structured-session-state'
+import type { ClaudeStructuredSessionEvent } from './structured/claude-structured-session-state'
 import {
   USER_MESSAGE,
   acquired,

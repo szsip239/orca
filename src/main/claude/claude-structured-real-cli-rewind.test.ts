@@ -3,8 +3,8 @@ import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
-import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
+import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-identity'
+import { claudeProviderHandle } from '../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
 import { resolveSessionFilePath } from '../native-chat/session-file-resolver'
 import {
   realClaudeAuthenticated,
@@ -17,11 +17,9 @@ import {
   CLAUDE_STRUCTURED_BASE_OPTIONS,
   type ClaudeStructuredSdkOptions
 } from './claude-structured-launch-resolution'
-import {
-  ClaudeStructuredSessionAdapter,
-  type ClaudeStructuredSessionEvent
-} from './claude-structured-session-adapter'
-import { claudeStartupSettled } from './claude-structured-session-test-support'
+import { ClaudeStructuredSessionAdapter } from './claude-structured-session-adapter'
+import type { ClaudeStructuredSessionEvent } from './structured/claude-structured-session-state'
+import { claudeStartupSettled } from './claude-structured-startup-settled-test-support'
 
 const SESSION_ID = 'real-cli-rewind'
 
@@ -61,6 +59,7 @@ describe.skipIf(!realClaudeAvailable)('Claude structured real CLI rewind', () =>
             providerSessionId,
             resumeLeafUuid: null,
             resumesTranscript: false,
+            cliFlag: async () => 'supported' as const,
             continuesChain: false
           }),
           onEvent: (event: ClaudeStructuredSessionEvent) => {

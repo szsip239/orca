@@ -14,7 +14,7 @@ import {
   type AgentProviderSessionMetadata,
   type ResumableTuiAgent,
   type SleepingAgentLaunchConfig
-} from '../../../shared/agent-session-resume'
+} from '../../../shared/agent-session/lifecycle/agent-session-resume'
 import { claudeConfigDirFromTranscriptPath } from '../../../shared/claude-transcript-config-dir'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import type { TuiAgent } from '../../../shared/tui-agent'

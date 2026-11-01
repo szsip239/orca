@@ -1,4 +1,4 @@
-import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
+import { agentSessionRefusalError } from '../../shared/agent-session/failures/agent-session-wire-refusals'
 // Capture native-chat children at the spawn boundary with production wiring; launch-path refactors must preserve these snapshots.
 
 import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
@@ -111,13 +111,16 @@ vi.mock('electron', () => ({
 }))
 
 import { setAppEnvironment } from '../../shared/app-environment'
-import { AGENT_SESSION_RECORD_SCHEMA_VERSION } from '../../shared/agent-session-record'
-import type { AgentSessionAccountHome, AgentSessionRecord } from '../../shared/agent-session-record'
-import type { AgentSessionProviderHandle } from '../../shared/agent-session-provider-handle'
+import {
+  AGENT_SESSION_RECORD_SCHEMA_VERSION,
+  type AgentSessionRecord
+} from '../../shared/agent-session/lifecycle/agent-session-record'
+import type { AgentSessionAccountHome } from '../../shared/agent-session/lifecycle/agent-session-account-home'
+import type { AgentSessionProviderHandle } from '../../shared/agent-session/lifecycle/agent-session-provider-handle'
 import {
   claudeProviderHandle,
   codexProviderHandle
-} from '../../shared/agent-session-provider-handle-encoding'
+} from '../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../shared/constants'
 import {
   ORCA_SCRUB_SAFE_LAUNCH_ENV,
@@ -641,6 +644,45 @@ afterAll(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('native-chat launch parity', () => {
+  it('wires only OMP at-rest discovery through configured host launch inputs without a conversation spawn', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const launch = {
+      agent: 'omp',
+      workspace: 'worktree',
+      start: 'fresh',
+      worker: false,
+      configured: true
+    } as const
+    const { record } = await recordFor(launch, 'omp-first-open')
+    settings = settingsFor(launch)
+    const context = adapterContext()
+    const adapter = STRUCTURED_AGENT_RUNTIME_REGISTRATIONS.find(
+      ({ definition }) => definition.agent === 'omp'
+    )!.createAdapter(context)
+    capture.spawns.length = 0
+    try {
+      expect(await adapter.atRestCommands!.settled!(record, 1_000)).toBeUndefined()
+      expect(capture.spawns).toHaveLength(1)
+      const child = childOf(capture.spawns[0]!)
+      expect(child.command).toBe('<root>/custom-bin/omp-custom')
+      expect(child.cwd).toBe('<root>/worktree')
+      expect(child.args).toEqual(expect.arrayContaining(['acp', '--session-dir']))
+      expect(child.env).toMatchObject({ PARITY_OVERLAY: 'omp-configured' })
+      expect(child.env).not.toHaveProperty('ORCA_AGENT_SESSION_ID')
+      expect(pins).toEqual([])
+      for (const agent of ['grok', 'opencode', 'opencode2', 'antigravity']) {
+        expect(
+          STRUCTURED_AGENT_RUNTIME_REGISTRATIONS.find(
+            ({ definition }) => definition.agent === agent
+          )!.createAdapter(context).atRestCommands
+        ).toBeUndefined()
+      }
+    } finally {
+      await adapter.closeAll()
+      vi.mocked(console.warn).mockRestore()
+    }
+  })
+
   it.each(CASES.map((launch, index) => [caseName(launch), launch, index] as const))(
     '%s',
     async (_name, launch, index) => {

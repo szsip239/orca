@@ -2,20 +2,20 @@ import { createElement } from 'react'
 import { AlertTriangle } from 'lucide-react-native'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { agentJournalSubmissionKey } from '../../../src/shared/agent-session-journal-item-key'
+import { agentJournalSubmissionKey } from '../../../src/shared/agent-session/journal/agent-session-journal-item-key'
 import type {
   AgentJournalItemBody,
   AgentJournalRenderItem,
-  AgentJournalSubmission,
-  AgentJournalTurnScope
-} from '../../../src/shared/agent-session-journal-types'
-import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
-import { agentSessionFailureFact } from '../../../src/shared/agent-session-failure'
-import { agentSessionFailureWords } from '../../../src/shared/agent-session-failure-words'
+  AgentJournalSubmission
+} from '../../../src/shared/agent-session/journal/agent-session-journal-types'
+import type { AgentJournalTurnScope } from '../../../src/shared/agent-session-journal-turn-scope'
+import type { NativeChatMessage } from '../../../src/shared/native-chat/native-chat-types'
+import { agentSessionFailureFact } from '../../../src/shared/agent-session/failures/agent-session-failure'
+import { agentSessionFailureWords } from '../../../src/shared/agent-session/failures/agent-session-failure-words'
 import { AGENT_SESSION_GOAL_CONTROL_COPY } from '../../../src/shared/agent-session-goal-control-copy'
-import { DISPATCH_REJECTED_CANCELLED } from '../../../src/shared/structured-agent-session-dispatch-rejection'
-import { projectStructuredAgentSessionMessages } from '../../../src/shared/structured-agent-session-message-projection'
-import { selectStructuredAgentSettledTurns } from '../../../src/shared/structured-agent-session-turn-timing'
+import { DISPATCH_REJECTED_CANCELLED } from '../../../src/shared/agent-session/requests/structured-agent-session-dispatch-rejection'
+import { projectStructuredAgentSessionMessages } from '../../../src/shared/agent-session/view/structured-agent-session-message-projection'
+import { selectStructuredAgentSettledTurns } from '../../../src/shared/agent-session/view/structured-agent-session-turn-timing'
 
 vi.mock('react-native', async () => {
   const React = await import('react')
@@ -67,13 +67,13 @@ vi.mock('lucide-react-native', () => ({
   Wrench: 'Wrench'
 }))
 vi.mock('../components/MobileMarkdown', () => ({ MobileMarkdown: () => null }))
-vi.mock('./MobileNativeChatMessageActionsSheet', () => ({
+vi.mock('./native-chat/transcript/MobileNativeChatMessageActionsSheet', () => ({
   MobileNativeChatMessageActionsSheet: () => null
 }))
 
 import { MobileMarkdown } from '../components/MobileMarkdown'
-import { MobileNativeChatMessage } from './MobileNativeChatMessage'
-import { useMobileNativeChatTurnDisclosure } from './use-mobile-native-chat-turn-disclosure'
+import { MobileNativeChatMessage } from './native-chat/transcript/MobileNativeChatMessage'
+import { useMobileNativeChatTurnDisclosure } from './native-chat/transcript/use-mobile-native-chat-turn-disclosure'
 
 const THREAD: AgentJournalTurnScope = { kind: 'thread' }
 let sequence = 0

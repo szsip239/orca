@@ -21,6 +21,10 @@ type AntigravityLaunchAccountArgs = {
 function selectedAntigravityLaunch(
   args: AntigravityLaunchAccountArgs
 ): { conflict: string | null } | null {
+  // Windows account selection applies the host default; the shell and agent own each launch.
+  if (process.platform === 'win32') {
+    return null
+  }
   const agent =
     args.launchAgent ??
     (args.command ? recognizeAgentProcessFromCommandLine(args.command)?.agent : null)

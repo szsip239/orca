@@ -1,11 +1,11 @@
 import type { AgentStatusState } from '../../../shared/agent-status-types'
+import { getAgentResumeArgv } from '../../../shared/agent-resume-argv'
 import {
-  getAgentResumeArgv,
   isResumableTuiAgent,
   normalizeAgentProviderSession,
   type AgentProviderSessionKey,
   type AgentProviderSessionMetadata
-} from '../../../shared/agent-session-resume'
+} from '../../../shared/agent-session/lifecycle/agent-session-resume'
 import { formatAgentTypeLabel } from '../../../shared/agent-type-label'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import type { TuiAgent } from '../../../shared/tui-agent'

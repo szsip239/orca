@@ -7,7 +7,7 @@ import { hasRegisteredRuntimeTerminalTab } from '@/runtime/mounted-terminal-tab-
 import { filterEnabledTuiAgents } from '../../../shared/tui-agent-selection'
 import { isTuiAgent } from '../../../shared/tui-agent-config'
 import { makePaneKey } from '../../../shared/stable-pane-id'
-import { normalizeAgentProviderSession } from '../../../shared/agent-session-resume'
+import { normalizeAgentProviderSession } from '../../../shared/agent-session/lifecycle/agent-session-resume'
 import type { AppState } from '@/store'
 import { collectAgentSessionRestartPlan } from './agent-session-restart-collect'
 import {

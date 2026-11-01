@@ -21,6 +21,7 @@ function createSession(
     disposed: false,
     authoritativeReattachGeneration: 0,
     remotePtyIncarnationId: null,
+    noteBoundProcessIncarnation: vi.fn(),
     transportStreamGeneration: 1,
     runtimeEnvironmentId: 'test-runtime',
     tabGeneration: 1,
@@ -29,6 +30,7 @@ function createSession(
     cacheKey: 'tab:leaf',
     pendingSpawnKey: 'tab:leaf',
     pendingReplacedPtyId: null,
+    userRestart: false,
     pendingSpawnDeferral: null,
     activePanePtyBinding: null,
     deferredSpawn: null,
@@ -52,7 +54,7 @@ function createSession(
     clearPaneMode2031State: vi.fn(),
     clearHiddenOutputRestoreState: vi.fn(),
     resetFreshSpawnFollowOutput: vi.fn(),
-    writeInputModeGround: vi.fn(),
+    groundInputModesForNewProcess: vi.fn(),
     prepareFreshShellViewportForSpawn: vi.fn(),
     captureTransportOutputCallbacks: vi.fn(
       (): {
@@ -150,6 +152,7 @@ describe('fresh spawn session restart settlement', () => {
       throw wrapped
     })
     refused.session.pendingReplacedPtyId = 'pty-old'
+    refused.session.userRestart = true
     await refused.session.startFreshSpawn()
     expect(refused.session.transport.attach).toHaveBeenCalledWith(
       expect.objectContaining({ existingPtyId: 'pty-old', callbacks })
@@ -172,6 +175,7 @@ describe('fresh spawn session restart settlement', () => {
       )
     })
     stale.session.pendingReplacedPtyId = 'pty-old'
+    stale.session.userRestart = true
     stale.getPtyId.mockReturnValue('pty-created')
     await stale.session.startFreshSpawn()
     expect(stale.session.transport.attach).not.toHaveBeenCalled()
@@ -202,6 +206,7 @@ describe('fresh spawn session restart settlement', () => {
     const received: string[] = []
     const restarted = createSession(async () => null, transport)
     restarted.session.pendingReplacedPtyId = 'pty-old'
+    restarted.session.userRestart = true
     restarted.session.captureTransportOutputCallbacks = () => ({
       generation: 1,
       callbacks: { onData: (data: string) => received.push(data) },

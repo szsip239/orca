@@ -3,7 +3,7 @@ import {
   normalizeAgentProviderSession,
   type AgentProviderSessionKey,
   type AgentProviderSessionMetadata
-} from '../../../shared/agent-session-resume'
+} from '../../../shared/agent-session/lifecycle/agent-session-resume'
 import type {
   AgentSessionRestartFence,
   AgentSessionRestartPane

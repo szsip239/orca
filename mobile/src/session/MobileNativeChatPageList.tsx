@@ -17,18 +17,20 @@ import type {
   StyleProp,
   ViewStyle
 } from 'react-native'
-import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
-import type { MobileNativeChatRowKeys } from './mobile-native-chat-row-keys'
+import type { NativeChatMessage } from '../../../src/shared/native-chat/native-chat-types'
+import type { MobileNativeChatRowKeys } from './native-chat/transcript/mobile-native-chat-row-keys'
 import { MobileNativeChatPageScroll } from './MobileNativeChatPageScroll'
 import {
   mobileNativeChatReadingDrift,
   mobileNativeChatReadingPlace,
   mobileNativeChatRowAbove,
+  mobileNativeChatRowBoxProps,
   type MobileNativeChatReadingUnit,
   type MobileNativeChatScrollNode
 } from './mobile-native-chat-reading-place'
 import type { MobileNativeChatListHandle } from './use-mobile-native-chat-tail-follow'
 import type { MobileNativeChatScrollRoots } from './mobile-native-chat-scroll-roots'
+import { scrollWritesStopMomentum } from './mobile-native-chat-scroll-motion'
 import {
   createMobileNativeChatGrowthHold,
   MobileNativeChatGrowthHoldContext
@@ -279,19 +281,31 @@ export function MobileNativeChatPageList({
     [scroller, write]
   )
 
+  const drawnHead = useRef<string | undefined>(undefined)
   useLayoutEffect(() => {
     const s = scroller()
-    if (s) {
-      keepPlace(s)
-      drawAndFetch(s)
+    if (!s) {
+      return
     }
+    // Chromium keeps a touch scroll's offset from the top, so rows drawn or cut above would carry the reader with them; a write hands the scroll the end-anchored offset.
+    if (keys[first] !== drawnHead.current) {
+      drawnHead.current = keys[first]
+      if (!resting() && !scrollWritesStopMomentum()) {
+        const top = s.scrollTop
+        s.scrollTop = top - 1
+        write(s, top)
+      }
+    }
+    keepPlace(s)
+    drawAndFetch(s)
   })
 
-  // Image/inner-box resize bypasses React commits; restore nested scroll boxes first.
+  // Content and viewport resizes (e.g. the composer growing) bypass commits; restore nested scroll boxes first.
   useEffect(() => {
     const s = scroller()
+    const viewport: Element | null | undefined = scroll.current?.getScrollableNode()
     const content: Element | null | undefined = scroll.current?.getInnerViewNode()
-    if (!s || !content || typeof ResizeObserver === 'undefined') {
+    if (!s || !viewport || !content || typeof ResizeObserver === 'undefined') {
       return
     }
     const observer = new ResizeObserver(() => {
@@ -299,6 +313,7 @@ export function MobileNativeChatPageList({
       keepPlace(s)
       drawAndFetch(s)
     })
+    observer.observe(viewport)
     observer.observe(content)
     roots?.observeWith(observer)
     return () => {
@@ -374,7 +389,7 @@ export function MobileNativeChatPageList({
           emptyStateView
         ) : (
           // Key by chat to reset rows; persist disclosures above windowed rows. Block flow avoids relaying out every row for each streamed token.
-          <div key={rowKeys.scope}>
+          <div key={rowKeys.scope} {...mobileNativeChatRowBoxProps}>
             {rows.slice(first).map((item, at) => {
               const index = first + at
               return (

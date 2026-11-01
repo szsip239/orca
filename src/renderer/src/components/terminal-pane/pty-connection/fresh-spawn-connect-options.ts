@@ -38,10 +38,8 @@ export function freshSpawnTransportConnectOptions(args: {
     ...(coldRestoreOverride ? { launchToken: coldRestoreOverride.launchToken } : {}),
     ...(coldRestoreOverride ? { launchAgent: coldRestoreOverride.agent } : {}),
     ...(session.shouldDeclareHiddenAtSpawn() ? { initiallyHidden: true } : {}),
-    resumeSpawnIntent: visibleAtSpawn ? 'user-resume' : 'automatic-restore',
-    ...(session.pendingReplacedPtyId
-      ? { claimReplacedPtyId: session.claimPendingReplacedPtyId }
-      : {}),
+    resumeSpawnIntent: visibleAtSpawn || session.userRestart ? 'user-resume' : 'automatic-restore',
+    ...(session.userRestart ? { claimReplacedPtyId: session.claimPendingReplacedPtyId } : {}),
     shouldContinue: () =>
       !session.disposed &&
       (findTerminalTabForPane(useAppStore.getState(), session.deps.worktreeId, session.deps.tabId)

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { AskPrompt } from '../../../../../src/shared/native-chat-ask'
+import type { AskPrompt } from '../../../../../src/shared/native-chat/input/native-chat-ask-types'
 import { useMobileNativeChatPromptDismiss } from './use-mobile-native-chat-prompt-dismiss'
 
 // Keep answered/collapsed asks across view toggles and remounts until an observed prompt supersedes them.
@@ -10,6 +10,7 @@ export function useMobileNativeChatAskDismiss(args: {
   scopeKey: string | null
   sessionKey: string | null
   observing: boolean
+  dismissAsync?: () => void
 }): {
   askKey: string | null
   showAsk: boolean
@@ -24,13 +25,16 @@ export function useMobileNativeChatAskDismiss(args: {
   )
   const dismiss = useMobileNativeChatPromptDismiss({ ...args, kind: 'ask', card })
   return {
-    askKey: dismiss.content,
+    askKey: args.ask?.replyAsMessage
+      ? JSON.stringify([args.scopeKey, args.sessionKey, dismiss.content])
+      : dismiss.content,
     showAsk: dismiss.showPrompt,
     collapsedAsk:
       dismiss.collapsed && args.ask
         ? { title: args.ask.questions[0]?.question ?? '', expand: dismiss.expandPrompt }
         : null,
-    dismissAsk: dismiss.dismissPrompt,
+    dismissAsk:
+      args.ask?.replyAsMessage && args.dismissAsync ? args.dismissAsync : dismiss.dismissPrompt,
     collapseAsk: dismiss.collapsePrompt
   }
 }

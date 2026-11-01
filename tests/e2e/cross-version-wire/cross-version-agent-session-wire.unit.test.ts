@@ -12,19 +12,19 @@ import { startsWhenPublished } from '../../../src/main/native-chat/agent-session
 import { setStructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-registry'
 import type { AgentSessionRecordStore } from '../../../src/main/runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../../src/main/runtime/agent-session-record-store-test-harness'
-import type { AgentSessionSubscribeEvent } from '../../../src/shared/agent-session-wire'
+import type { AgentSessionSubscribeEvent } from '../../../src/shared/agent-session/agent-session-wire'
 import {
   AGENT_SESSION_ACCEPTED_SEND_RUNTIME_CAPABILITY,
-  AGENT_SESSION_CONVERSATION_STOP_RUNTIME_CAPABILITY,
   AGENT_SESSION_PENDING_SEND_RESULT_RUNTIME_CAPABILITY,
   AGENT_SESSION_QUESTION_ANSWERS_RUNTIME_CAPABILITY,
   AGENT_SESSION_REWIND_RUNTIME_CAPABILITY,
   AGENT_SESSION_CONVERSATION_OUTLINE_RUNTIME_CAPABILITY,
-  AGENT_SESSION_STATUS_FEED_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
-} from '../../../src/shared/protocol-version'
-import { AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY } from '../../../src/shared/agent-session-create-capabilities'
+} from '../../../src/shared/agent-session/agent-session-runtime-capabilities'
+import { AGENT_SESSION_STATUS_FEED_RUNTIME_CAPABILITY } from '../../../src/shared/agent-session/agent-session-attention-capabilities'
+import { AGENT_SESSION_CONVERSATION_STOP_RUNTIME_CAPABILITY } from '../../../src/shared/agent-session/lifecycle/agent-session-stop-capabilities'
+import { AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY } from '../../../src/shared/agent-session/agent-session-create-capabilities'
 import { resolveBaselineReleaseRef } from './release-checkout'
 import {
   callBuild,
@@ -61,9 +61,9 @@ import {
   type RpcClientIdentity,
   type RpcReply
 } from './versioned-agent-session-wire'
-import { openTestJournalHostDatabase } from '../../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
+import * as journalHostDatabase from '../../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-logger'
-import { codexProviderHandle } from '../../../src/shared/agent-session-provider-handle-encoding'
+import { codexProviderHandle } from '../../../src/shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
 import { NO_STRUCTURED_AGENTS } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-adapter-router-test-support'
 import { describeReleasedStopNoteProjection } from './cross-version-stop-note-scenarios'
 
@@ -101,6 +101,12 @@ function baselineStructuredMethods(): string[] {
   return baseline.methodNames.filter((name) => name.startsWith('agentSession.'))
 }
 
+async function releaseHostRoot(root: string): Promise<void> {
+  setStructuredAgentSessionHost(null)
+  await journalHostDatabase.closeTestJournalHostDatabase(root)
+  await rm(root, { recursive: true, force: true })
+}
+
 describe('cross-version structured agent sessions', () => {
   it(
     'skews current code against a real published release',
@@ -117,7 +123,7 @@ describe('cross-version structured agent sessions', () => {
   )
 
   describe('a client that never asked for structured sessions', () => {
-    let hostCalls: Record<string, ReturnType<typeof vi.fn>>
+    let hostCalls: ReturnType<typeof structuredHostStub>
 
     beforeEach(() => {
       resetOperationIds()
@@ -485,7 +491,7 @@ describe('cross-version structured agent sessions', () => {
           spawnToken: 'spawn-vault',
           host: () => host
         }),
-        journalDatabase: openTestJournalHostDatabase(root),
+        journalDatabase: journalHostDatabase.openTestJournalHostDatabase(root),
         claimKeyId: 'key-1',
         mintSpawnToken: () => 'spawn-vault',
         now: () => NOW
@@ -529,10 +535,7 @@ describe('cross-version structured agent sessions', () => {
       }
     })
 
-    afterEach(async () => {
-      setStructuredAgentSessionHost(null)
-      await rm(root, { recursive: true, force: true })
-    })
+    afterEach(() => releaseHostRoot(root))
 
     it('hides the row from the old client and annotates it for a capable client', async () => {
       const [oldReply] = await callBuild(
@@ -716,7 +719,7 @@ describe('cross-version structured agent sessions', () => {
         logger: createStructuredAgentSessionLogger(),
         store,
         adapter: adapter(() => host),
-        journalDatabase: openTestJournalHostDatabase(root),
+        journalDatabase: journalHostDatabase.openTestJournalHostDatabase(root),
         claimKeyId: 'key-1',
         mintSpawnToken: () => `spawn-${generation}`,
         // The provider died with the host that spawned it, which is what makes
@@ -787,10 +790,7 @@ describe('cross-version structured agent sessions', () => {
       await bootHost('a')
     })
 
-    afterEach(async () => {
-      setStructuredAgentSessionHost(null)
-      await rm(root, { recursive: true, force: true })
-    })
+    afterEach(() => releaseHostRoot(root))
 
     it('resumes from the cursor the client held, with no snapshot and no replay', async () => {
       const created = await answer('agentSession.create', createIntentParams())
@@ -800,9 +800,9 @@ describe('cross-version structured agent sessions', () => {
       const held = first.cursor
 
       const restarted = await bootHost('b')
-      await restarted.restoreReadableSessions()
-      // Restart restores the session for READING. The chat the client still has open takes its
-      // hold, and that is what gives the session a provider child again.
+      await restarted.seedSessionTabs([SESSION])
+      await restarted.revealSession(SESSION)
+      // Demand-open restores reading; the retained chat's hold starts its provider child again.
       await answer('agentSession.hold', {
         sessionId: SESSION,
         holderId: 'surface-1'

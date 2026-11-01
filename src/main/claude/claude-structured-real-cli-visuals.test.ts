@@ -3,14 +3,14 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
+import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-identity'
 import { agentSessionRecordFixture } from '../native-chat/agent-session-record-test-fixture'
-import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
+import { claudeProviderHandle } from '../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
 import { createNativeChatVisualsDelivery } from '../native-chat/native-chat-visuals-delivery'
 import { nativeChatScratchFolderFor } from '../native-chat/native-chat-scratch-folder'
 import { NATIVE_CHAT_VISUALS_SKILL_NAME } from '../native-chat/native-chat-visuals-skill-location'
 import { createClaudeCliFlagSupport } from './claude-cli-flag-support'
-import { readClaudeInit } from './claude-structured-init-proof'
+import { readClaudeInit } from './structured/claude-structured-init-proof'
 import {
   realClaudeAuthenticated,
   realClaudeAvailable,
@@ -18,10 +18,8 @@ import {
   realClaudeCommand,
   realClaudeLaunchHome
 } from './claude-real-cli-availability-test-support'
-import {
-  ClaudeStructuredSessionAdapter,
-  type ClaudeStructuredSessionEvent
-} from './claude-structured-session-adapter'
+import { ClaudeStructuredSessionAdapter } from './claude-structured-session-adapter'
+import type { ClaudeStructuredSessionEvent } from './structured/claude-structured-session-state'
 
 const SESSION_ID = 'real-cli-visuals'
 const listed = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
@@ -45,7 +43,7 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
       const resolveLaunch = createClaudeStructuredLaunchResolver({
         store: { getRecord: () => record, pinLaunchDirectory: vi.fn() },
         resolveWorkspacePath: async () => cwd,
-        resolveCommand: () => realClaudeCommand,
+        resolveCommand: () => ({ command: realClaudeCommand, prefixArgs: [] }),
         resolveLaunchArgs: () => [],
         resolveEnv: () => realClaudeLaunchHome().env,
         resolveAuthPolicy: () => ({ account: 'system' }),

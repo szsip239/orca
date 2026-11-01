@@ -3,29 +3,27 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
-import type { AgentSessionExecutionOptions } from '../../shared/agent-session-execution-options'
-import { readAgentJournalTurn } from '../../shared/agent-session-turn-record'
+import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-identity'
+import type { AgentSessionExecutionOptions } from '../../shared/agent-session/options/agent-session-execution-options'
+import { readAgentJournalTurn } from '../../shared/agent-session/lifecycle/agent-session-turn-record'
 import {
   claudeProviderHandle,
   claudeProviderHandleLeafUuid
-} from '../../shared/agent-session-provider-handle-encoding'
+} from '../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
 import {
   CLAUDE_STRUCTURED_BASE_OPTIONS,
   claudeStructuredPermissionOptions
 } from './claude-structured-launch-resolution'
 import { listedModels } from './claude-structured-model-catalog'
-import {
-  ClaudeStructuredSessionAdapter,
-  type ClaudeStructuredSessionEvent
-} from './claude-structured-session-adapter'
+import { ClaudeStructuredSessionAdapter } from './claude-structured-session-adapter'
+import type { ClaudeStructuredSessionEvent } from './structured/claude-structured-session-state'
 import {
   realClaudeAuthenticated,
   realClaudeAvailable,
   realClaudeCommand,
   realClaudeLaunchHome
 } from './claude-real-cli-availability-test-support'
-import { claudeStartupSettled } from './claude-structured-session-test-support'
+import { claudeStartupSettled } from './claude-structured-startup-settled-test-support'
 import { journal } from './claude-context-usage-test-support'
 
 const SESSION_ID = 'real-cli-options'
@@ -92,6 +90,7 @@ describe.skipIf(!realClaudeAvailable)('Claude structured real CLI options', () =
                 ? claudeProviderHandleLeafUuid(launchIdentity.providerHandle)
                 : null,
             resumesTranscript: resumes,
+            cliFlag: async () => 'supported' as const,
             continuesChain: resumes
           }
         },

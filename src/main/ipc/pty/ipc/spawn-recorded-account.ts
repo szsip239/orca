@@ -1,4 +1,4 @@
-import type { AgentProviderSessionMetadata } from '../../../../shared/agent-session-resume'
+import type { AgentProviderSessionMetadata } from '../../../../shared/agent-session/lifecycle/agent-session-resume'
 import { claudeConfigDirFromTranscriptPath } from '../../../../shared/claude-transcript-config-dir'
 import {
   CLAUDE_INJECTED_CONFIG_DIR_ENV,
