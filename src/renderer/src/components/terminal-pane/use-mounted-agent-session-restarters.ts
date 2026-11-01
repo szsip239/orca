@@ -10,7 +10,7 @@ type Restart = (
   paneId: number,
   startup: PtyConnectionDeps['startup'],
   options: { focus: boolean }
-) => void
+) => boolean
 
 export function useMountedAgentSessionRestarters(
   controller: {
@@ -68,8 +68,7 @@ export function useMountedAgentSessionRestarters(
               if (!current || bound !== ptyId) {
                 return false
               }
-              restart(pane.id, startup, { focus: false })
-              return true
+              return restart(pane.id, startup, { focus: false })
             })
           )
         }

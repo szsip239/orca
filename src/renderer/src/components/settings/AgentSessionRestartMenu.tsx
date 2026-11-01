@@ -1,4 +1,5 @@
 import { useMemo, useState, useSyncExternalStore } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { ChevronDown, RotateCcw } from 'lucide-react'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
@@ -34,32 +35,38 @@ const NO_COMMAND_PANES: readonly AgentSessionRestartTarget[] = []
 const NO_UNAVAILABLE: readonly string[] = []
 
 export function AgentSessionRestartMenu(): React.JSX.Element {
-  const tabsByWorktree = useAppStore((state) => state.tabsByWorktree)
-  const terminalLayoutsByTabId = useAppStore((state) => state.terminalLayoutsByTabId)
-  const ptyIdsByTabId = useAppStore((state) => state.ptyIdsByTabId)
-  const agentStatusByPaneKey = useAppStore((state) => state.agentStatusByPaneKey)
-  const launchConfigs = useAppStore((state) => state.agentLaunchConfigByPaneKey)
-  const sleepingSessions = useAppStore((state) => state.sleepingAgentSessionsByPaneKey)
-  const disabledTuiAgents = useAppStore((state) => state.settings?.disabledTuiAgents)
+  const inputs = useAppStore(
+    useShallow((state) => ({
+      tabs: state.tabsByWorktree,
+      layouts: state.terminalLayoutsByTabId,
+      ptys: state.ptyIdsByTabId,
+      statuses: state.agentStatusByPaneKey,
+      foreground: state.paneForegroundAgentByPaneKey,
+      launches: state.agentLaunchConfigByPaneKey,
+      sleeping: state.sleepingAgentSessionsByPaneKey,
+      settings: state.settings,
+      repos: state.repos,
+      worktrees: state.worktreesByRepo,
+      detectedWorktrees: state.detectedWorktreesByRepo,
+      folders: state.folderWorkspaces,
+      groups: state.projectGroups,
+      projects: state.projects,
+      activeRepoId: state.activeRepoId,
+      activeWorktreeId: state.activeWorktreeId,
+      activeHost: state.activeWorkspaceExecutionHostId,
+      restoredHosts: state.restoredRuntimeHostIdByWorkspaceSessionKey,
+      environments: state.runtimeEnvironments,
+      environmentsHydrated: state.runtimeEnvironmentCatalogHydrated,
+      removedEnvironments: state.removedRuntimeEnvironmentIds,
+      sshConnections: state.sshConnectionStates,
+      sshEnvironments: state.sshStateByEnvironment,
+      runtimeStatuses: state.runtimeStatusByEnvironmentId
+    }))
+  )
   const plan = useMemo(() => {
-    // The subscribed snapshots are the rerender inputs. Collection reads the same store.
-    void tabsByWorktree
-    void terminalLayoutsByTabId
-    void ptyIdsByTabId
-    void agentStatusByPaneKey
-    void disabledTuiAgents
-    void launchConfigs
-    void sleepingSessions
+    void inputs
     return collectAgentSessionRestartPlanFromState(useAppStore.getState())
-  }, [
-    tabsByWorktree,
-    terminalLayoutsByTabId,
-    ptyIdsByTabId,
-    agentStatusByPaneKey,
-    disabledTuiAgents,
-    launchConfigs,
-    sleepingSessions
-  ])
+  }, [inputs])
   const [commandTarget, setCommandTarget] = useState<AgentSessionRestartTarget | null>(null)
   const controller = getAgentSessionRestartController()
   const report = useSyncExternalStore(controller.subscribe, controller.getSnapshot)

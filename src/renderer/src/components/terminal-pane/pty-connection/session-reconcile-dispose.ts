@@ -6,6 +6,7 @@ import { PANE_PTY_RESIZE_HOLD_FLUSH_EVENT } from '@/lib/pane-manager/pane-pty-re
 import { discardTerminalOutput } from '@/lib/pane-manager/pane-terminal-output-scheduler'
 import { getProviderSessionClaimKey } from '@/lib/sleeping-agent-pane-ownership'
 import { releaseRendererPtyVisibilityClaim } from '../pty-renderer-delivery-claims'
+import { settleAgentSessionRestart } from '@/lib/agent-session-restart-verdict'
 
 import { isRemoteRuntimePtyId } from '../../../../../shared/remote-runtime/remote-runtime-pty-id'
 import { SHIFT_ENTER_RECONFIRM_IDLE_MS } from './foreground-output-scan'
@@ -150,6 +151,9 @@ export function installSessionReconcileDispose(session: ConnectPanePtySession): 
       session.spawnedFreshPtyId === ptyId && !Number.isFinite(session.lastTerminalInputAt),
     dispose() {
       session.disposed = true
+      if (!session.connectStarted) {
+        settleAgentSessionRestart(session.paneStartup, null, { notified: false })
+      }
       session.discardAgentPreReadyDraft?.()
       session.cleanupKittyFileReader()
       session.disposeSpawnDeferral()

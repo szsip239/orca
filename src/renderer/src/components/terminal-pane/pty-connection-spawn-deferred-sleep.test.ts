@@ -309,6 +309,30 @@ describe('connectPanePty: a restore the host kept asleep', () => {
     }
   )
 
+  it('settles a restart if its pane is disposed before the pending cwd resolves', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport(null)
+    transportFactoryQueue.push(transport)
+    const settled = vi.fn()
+    const pane = createPane(1)
+    const deps = createDeps({
+      cwdPromise: new Promise<string>(() => {}),
+      replacesPtyId: 'old-pty',
+      startup: {
+        command: "claude --resume 'provider-session-1'",
+        launchAgent: 'claude',
+        resumeProviderSession: RESUME,
+        onSessionRestartSettled: settled
+      }
+    })
+    const binding = connectPanePty(...mockPanePtyArgs(pane, createManager(1), deps))
+    await flushAsyncTicks(10)
+    expect(settled).not.toHaveBeenCalled()
+    binding.dispose()
+    expect(settled).toHaveBeenCalledOnce()
+    expect(settled).toHaveBeenCalledWith(null)
+  })
+
   it('fences late main outcomes and preserves only explicit legacy fallback', async () => {
     const { attachToMainResumedSleepPane } =
       await import('./pty-connection/main-resumed-sleep-pane')

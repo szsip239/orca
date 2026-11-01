@@ -16,7 +16,7 @@ it('registers after the later mount effect initializes a restored pane and rejec
   const pane = { id: 1, leafId, container: document.createElement('div') }
   const manager = { getPanes: () => [{ ...pane }] }
   const managerRef: { current: typeof manager | null } = { current: null }
-  const restart = vi.fn()
+  const restart = vi.fn(() => true)
   const controller: Parameters<typeof useMountedAgentSessionRestarters>[0] = {
     managerRef,
     paneTransportsRef: { current: new Map() },
@@ -42,9 +42,11 @@ it('registers after the later mount effect initializes a restored pane and rejec
     pane.container.dataset.ptyId = 'restored-pty'
     expect(callback?.({ command: 'claude --resume original' })).toBe(true)
     expect(restart).toHaveBeenCalledTimes(1)
+    restart.mockReturnValueOnce(false)
+    expect(callback?.({ command: 'claude --resume original' })).toBe(false)
     pane.container.dataset.ptyId = 'different-pty'
     expect(callback?.({ command: 'claude --resume original' })).toBe(false)
-    expect(restart).toHaveBeenCalledTimes(1)
+    expect(restart).toHaveBeenCalledTimes(2)
   } finally {
     await act(async () => {
       root.unmount()

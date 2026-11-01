@@ -76,7 +76,7 @@ export function useTerminalPaneProcessExitActions(controller: TerminalPaneCloseC
       const manager = managerRef.current
       const pane = manager?.getPanes().find((candidate) => candidate.id === paneId)
       if (!manager || !pane) {
-        return
+        return false
       }
       const transport = paneTransportsRef.current.get(paneId)
       const panePtyBinding = panePtyBindingsRef.current.get(paneId)
@@ -132,6 +132,7 @@ export function useTerminalPaneProcessExitActions(controller: TerminalPaneCloseC
       if (options.focus) {
         manager.setActivePane(paneId, { focus: true })
       }
+      return true
     },
     [
       clearCodexRestartNotice,
